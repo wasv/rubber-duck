@@ -171,7 +171,7 @@ def main(ARGS):
                          input_rate=ARGS.rate,
                          file=ARGS.file)
     print("Listening (ctrl-C to exit)...")
-    frames = vad_audio.vad_collector()
+    frames = vad_audio.vad_collector(ratio=ARGS.vad_padding)
 
     # Stream from microphone to DeepSpeech using VAD
     spinner = None
@@ -203,6 +203,8 @@ if __name__ == '__main__':
 
     parser.add_argument('-v', '--vad_aggressiveness', type=int, default=3,
                         help="Set aggressiveness of VAD: an integer between 0 and 3, 0 being the least aggressive about filtering out non-speech, 3 the most aggressive. Default: 3")
+    parser.add_argument('-p', '--vad_padding', type=float, default=0.75,
+                        help="Set padding ratio for VAD: an float between 0.0 and 1.0, 0.0 being the least padding, 1.0 being the most. Default: 0.75")
     parser.add_argument('--nospinner', action='store_true',
                         help="Disable spinner")
     parser.add_argument('-w', '--savewav',
