@@ -22,6 +22,8 @@ class Audio(object):
     CHANNELS = 1
     BLOCKS_PER_SECOND = 50
 
+    _log = logging.getLogger("audio")
+
     def __init__(self, callback=None, device=None, input_rate=RATE_PROCESS, file=None):
         def proxy_callback(in_data, frame_count, time_info, status):
             # pylint: disable=unused-argument
@@ -104,11 +106,13 @@ class Audio(object):
         wf.setframerate(self.sample_rate)
         wf.writeframes(data)
         wf.close()
-        logging.info("Wrote audio to file: %s", filename)
+        self._log.info("Wrote audio to file: %s", filename)
 
 
 class VADAudio(Audio):
     """Filter & segment audio with voice activity detection."""
+
+    _log = logging.getLogger("audio/vad")
 
     def __init__(self, aggressiveness=3, device=None, input_rate=None, file=None):
         super().__init__(device=device, input_rate=input_rate, file=file)
@@ -140,6 +144,7 @@ class VADAudio(Audio):
 
         for frame in frames:
             if len(frame) < 640:
+                self._log.error("End of audio, VAD generator ending")
                 return
 
             is_speech = self.vad.is_speech(frame, self.sample_rate)
@@ -150,6 +155,7 @@ class VADAudio(Audio):
                 if num_voiced > ratio * ring_buffer.maxlen:
                     triggered = True
                     for f, s in ring_buffer:
+                        self._log.debug("New frame")
                         yield f
                     ring_buffer.clear()
 
@@ -160,5 +166,6 @@ class VADAudio(Audio):
                     [f for f, speech in ring_buffer if not speech])
                 if num_unvoiced > ratio * ring_buffer.maxlen:
                     triggered = False
+                    self._log.info("New utterance")
                     yield None
                     ring_buffer.clear()
