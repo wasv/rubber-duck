@@ -1,16 +1,11 @@
 import argparse
 import os
-import logging
-
 from datetime import datetime
-
-import deepspeech
-import numpy as np
 
 from halo import Halo
 
 from .audio import VADAudio
-
+from .speech import Recognizer
 
 DEFAULT_SAMPLE_RATE = 16000
 
@@ -55,11 +50,7 @@ if os.path.isdir(ARGS.model):
     ARGS.scorer = os.path.join(model_dir, ARGS.scorer)
 
 print('Initializing model...')
-logging.info("ARGS.model: %s", ARGS.model)
-model = deepspeech.Model(ARGS.model)
-if ARGS.scorer:
-    logging.info("ARGS.scorer: %s", ARGS.scorer)
-    model.enableExternalScorer(ARGS.scorer)
+recognizer = Recognizer(ARGS.model, ARGS.scorer)
 
 # Start audio with VAD
 vad_audio = VADAudio(aggressiveness=ARGS.vad_aggressiveness,
@@ -73,25 +64,24 @@ frames = vad_audio.vad_collector(ratio=ARGS.vad_padding)
 spinner = None
 if not ARGS.nospinner:
     spinner = Halo(spinner='line')
-stream_context = model.createStream()
 wav_data = bytearray()
+
 for frame in frames:
     if frame is not None:
         if spinner:
             spinner.start()
-        logging.debug("streaming frame")
-        stream_context.feedAudioContent(np.frombuffer(frame, np.int16))
+        recognizer.process_frame(frame)
+
         if ARGS.savewav:
             wav_data.extend(frame)
     else:
         if spinner:
             spinner.stop()
-        logging.debug("end utterence")
+
         if ARGS.savewav:
-            vad_audio.write_wav(
-                os.path.join(ARGS.savewav, datetime.now().strftime("savewav_%Y-%m-%d_%H-%M-%S_%f.wav")),
-                wav_data)
+            filename = datetime.now().strftime("rec_%Y-%m-%d_%H-%M-%S_%f.wav")
+            vad_audio.write_wav(os.path.join(ARGS.savewav, filename), wav_data)
             wav_data = bytearray()
-        text = stream_context.finishStream()
+
+        text = recognizer.get_results()
         print("Recognized: %s" % text)
-        stream_context = model.createStream()
