@@ -96,7 +96,6 @@ class Audio(object):
         lambda self: 1000 * self.block_size // self.sample_rate)
 
     def write_wav(self, filename, data):
-        logging.info("write wav %s", filename)
         wf = wave.open(filename, 'wb')
         wf.setnchannels(self.CHANNELS)
         # wf.setsampwidth(self.pa.get_sample_size(FORMAT))
@@ -105,6 +104,7 @@ class Audio(object):
         wf.setframerate(self.sample_rate)
         wf.writeframes(data)
         wf.close()
+        logging.info("Wrote audio to file: %s", filename)
 
 
 class VADAudio(Audio):
