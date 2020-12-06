@@ -31,35 +31,36 @@ class Audio(object):
                 in_data = self.wf.readframes(self.chunk)
             callback(in_data)
             return (None, pyaudio.paContinue)
+
         if callback is None:
+
             def callback(in_data):
                 return self.buffer_queue.put(in_data)
+
         self.buffer_queue = queue.Queue()
         self.device = device
         self.input_rate = input_rate
         self.sample_rate = self.RATE_PROCESS
-        self.block_size = int(self.RATE_PROCESS /
-                              float(self.BLOCKS_PER_SECOND))
-        self.block_size_input = int(
-            self.input_rate / float(self.BLOCKS_PER_SECOND))
+        self.block_size = int(self.RATE_PROCESS / float(self.BLOCKS_PER_SECOND))
+        self.block_size_input = int(self.input_rate / float(self.BLOCKS_PER_SECOND))
         self.pa = pyaudio.PyAudio()
 
         kwargs = {
-            'format': self.FORMAT,
-            'channels': self.CHANNELS,
-            'rate': self.input_rate,
-            'input': True,
-            'frames_per_buffer': self.block_size_input,
-            'stream_callback': proxy_callback,
+            "format": self.FORMAT,
+            "channels": self.CHANNELS,
+            "rate": self.input_rate,
+            "input": True,
+            "frames_per_buffer": self.block_size_input,
+            "stream_callback": proxy_callback,
         }
 
         self.chunk = None
         # if not default device
         if self.device:
-            kwargs['input_device_index'] = self.device
+            kwargs["input_device_index"] = self.device
         elif file is not None:
             self.chunk = 320
-            self.wf = wave.open(file, 'rb')
+            self.wf = wave.open(file, "rb")
 
         self.stream = self.pa.open(**kwargs)
         self.stream.start_stream()
@@ -82,8 +83,7 @@ class Audio(object):
 
     def read_resampled(self):
         """Return a block of audio data resampled to 16000hz, blocking if necessary."""
-        return self.resample(data=self.buffer_queue.get(),
-                             input_rate=self.input_rate)
+        return self.resample(data=self.buffer_queue.get(), input_rate=self.input_rate)
 
     def read(self):
         """Return a block of audio data, blocking if necessary."""
@@ -95,10 +95,11 @@ class Audio(object):
         self.pa.terminate()
 
     frame_duration_ms = property(
-        lambda self: 1000 * self.block_size // self.sample_rate)
+        lambda self: 1000 * self.block_size // self.sample_rate
+    )
 
     def write_wav(self, filename, data):
-        wf = wave.open(filename, 'wb')
+        wf = wave.open(filename, "wb")
         wf.setnchannels(self.CHANNELS)
         # wf.setsampwidth(self.pa.get_sample_size(FORMAT))
         assert self.FORMAT == pyaudio.paInt16
@@ -162,8 +163,7 @@ class VADAudio(Audio):
             else:
                 yield frame
                 ring_buffer.append((frame, is_speech))
-                num_unvoiced = len(
-                    [f for f, speech in ring_buffer if not speech])
+                num_unvoiced = len([f for f, speech in ring_buffer if not speech])
                 if num_unvoiced > ratio * ring_buffer.maxlen:
                     triggered = False
                     self._log.info("New utterance")
