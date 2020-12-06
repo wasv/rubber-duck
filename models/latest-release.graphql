@@ -1,0 +1,10 @@
+
+query($owner: String!, $repo: String!) {
+  repository(owner: $owner, name: $repo) {
+    releases(orderBy: {field: CREATED_AT, direction: DESC}, first: 1) {
+      nodes {
+        tagName
+      }
+    }
+  }
+}

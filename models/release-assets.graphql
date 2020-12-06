@@ -1,0 +1,19 @@
+query($owner: String!, $repo: String!, $release: String!, $endCursor: String) {
+  repository(owner: $owner, name: $repo) {
+    name
+    release(tagName: $release) {
+      tagName
+      releaseAssets(first: 50, after: $endCursor) {
+        nodes {
+          name
+          downloadUrl
+          contentType
+        }
+        pageInfo {
+          endCursor
+          hasNextPage
+        }
+      }
+    }
+  }
+}
