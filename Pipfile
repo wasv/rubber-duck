@@ -4,7 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [scripts]
-recognize = "python -m rduck -m models/deepspeech-0.9.2-models.pbmm -s models/deepspeech-0.9.2-models.scorer -d 16 -w audio"
+recognize = "python -m rduck -m models/deepspeech.pbmm -s models/deepspeech.scorer -w audio"
 
 [packages]
 deepspeech = "~=0.8.0"

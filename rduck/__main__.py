@@ -1,5 +1,6 @@
 import argparse
 import os
+import logging
 from datetime import datetime
 
 from halo import Halo
@@ -12,13 +13,14 @@ DEFAULT_SAMPLE_RATE = 16000
 parser = argparse.ArgumentParser(
     description="Stream from microphone to DeepSpeech using VAD")
 
-parser.add_argument('-v', '--vad_aggressiveness', type=int, default=3,
+parser.add_argument('-v', '--verbose', action='count', default=0,
+                    help="Logging level, use -v for info, -vv for debug.")
+parser.add_argument('-a', '--vad_aggressiveness', type=int, default=3,
                     help="Set aggressiveness of VAD: an integer between 0 " +
                     "and 3, 0 being the least aggressive about filtering out " +
                     "non-speech, 3 the most aggressive. Default: 3")
-parser.add_argument('-p', '--vad_padding', type=int, default=0.75,
-                    help="Set padding ratio for VAD: an float between 0.0 " +
-                    "and 1.0, 0.0 being the least padding, 1.0 being the most. Default: 0.75")
+parser.add_argument('-p', '--vad_padding', type=int, default=300,
+                    help="Set padding time for VAD: an int in ms. Default: 300")
 parser.add_argument('--nospinner', action='store_true',
                     help="Disable spinner")
 parser.add_argument('-w', '--savewav',
@@ -40,6 +42,12 @@ parser.add_argument('-r', '--rate', type=int, default=DEFAULT_SAMPLE_RATE,
                     " Your device may require 44100.")
 
 ARGS = parser.parse_args()
+
+if ARGS.verbose == 1:
+    logging.basicConfig(level=logging.INFO)
+elif ARGS.verbose == 2:
+    logging.basicConfig(level=logging.DEBUG)
+
 if ARGS.savewav:
     os.makedirs(ARGS.savewav, exist_ok=True)
 
@@ -58,7 +66,7 @@ vad_audio = VADAudio(aggressiveness=ARGS.vad_aggressiveness,
                      input_rate=ARGS.rate,
                      file=ARGS.file)
 print("Listening (ctrl-C to exit)...")
-frames = vad_audio.vad_collector(ratio=ARGS.vad_padding)
+frames = vad_audio.vad_collector(padding_ms=ARGS.vad_padding)
 
 # Stream from microphone to DeepSpeech using VAD
 spinner = None
