@@ -1,7 +1,7 @@
-query($owner: String!, $repo: String!, $release: String!, $endCursor: String) {
+query($owner: String!, $repo: String!, $endCursor: String) {
   repository(owner: $owner, name: $repo) {
     name
-    release(tagName: $release) {
+    latestRelease {
       tagName
       releaseAssets(first: 50, after: $endCursor) {
         nodes {
