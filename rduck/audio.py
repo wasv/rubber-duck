@@ -24,23 +24,17 @@ class Audio(object):
 
     _log = logging.getLogger("audio")
 
-    def __init__(self, callback=None, device=None, input_rate=RATE_PROCESS, file=None):
+    def __init__(self, callback=None, device=None, input_rate=RATE_PROCESS):
         def proxy_callback(in_data, frame_count, time_info, status):
             # pylint: disable=unused-argument
-            if self.chunk is not None:
-                in_data = self.wf.readframes(self.chunk)
-            callback(in_data)
+            if callback is not None:
+                in_data = callback(in_data)
+            self.buffer_queue.put(in_data)
             return (None, pyaudio.paContinue)
-
-        if callback is None:
-
-            def callback(in_data):
-                return self.buffer_queue.put(in_data)
 
         self.buffer_queue = queue.Queue()
         self.device = device
         self.input_rate = input_rate
-        self.sample_rate = self.RATE_PROCESS
         self.block_size = int(self.RATE_PROCESS / float(self.BLOCKS_PER_SECOND))
         self.block_size_input = int(self.input_rate / float(self.BLOCKS_PER_SECOND))
         self.pa = pyaudio.PyAudio()
@@ -53,17 +47,19 @@ class Audio(object):
             "frames_per_buffer": self.block_size_input,
             "stream_callback": proxy_callback,
         }
+        print(kwargs)
 
         self.chunk = None
         # if not default device
         if self.device:
             kwargs["input_device_index"] = self.device
-        elif file is not None:
-            self.chunk = 320
-            self.wf = wave.open(file, "rb")
 
         self.stream = self.pa.open(**kwargs)
         self.stream.start_stream()
+
+    frame_duration_ms = property(
+        lambda self: 1000 * self.block_size // self.RATE_PROCESS
+    )
 
     def resample(self, data, input_rate):
         """
@@ -72,7 +68,7 @@ class Audio(object):
         deepspeech
 
         Args:
-            data (binary): Input audio stream
+            data (bytes): Input audio stream
             input_rate (int): Input audio rate to resample from
         """
         data16 = np.fromstring(string=data, dtype=np.int16)
@@ -81,22 +77,25 @@ class Audio(object):
         resample16 = np.array(resample, dtype=np.int16)
         return resample16.tostring()
 
-    def read_resampled(self):
-        """Return a block of audio data resampled to 16000hz, blocking if necessary."""
-        return self.resample(data=self.buffer_queue.get(), input_rate=self.input_rate)
-
-    def read(self):
+    def read(self, sample_rate=None):
         """Return a block of audio data, blocking if necessary."""
-        return self.buffer_queue.get()
+        if sample_rate is None:
+            sample_rate = self.RATE_PROCESS
+
+        if sample_rate == self.input_rate:
+            return self.buffer_queue.get()
+        else:
+            return self.resample(data=self.buffer_queue.get(), input_rate=self.input_rate)
+
+    def frame_generator(self):
+        """Generator that yields all audio frames from microphone."""
+        while True:
+            yield self.read()
 
     def destroy(self):
         self.stream.stop_stream()
         self.stream.close()
         self.pa.terminate()
-
-    frame_duration_ms = property(
-        lambda self: 1000 * self.block_size // self.sample_rate
-    )
 
     def write_wav(self, filename, data):
         wf = wave.open(filename, "wb")
@@ -104,29 +103,20 @@ class Audio(object):
         # wf.setsampwidth(self.pa.get_sample_size(FORMAT))
         assert self.FORMAT == pyaudio.paInt16
         wf.setsampwidth(2)
-        wf.setframerate(self.sample_rate)
+        wf.setframerate(self.RATE_PROCESS)
         wf.writeframes(data)
         wf.close()
         self._log.info("Wrote audio to file: %s", filename)
 
 
-class VADAudio(Audio):
+class VADetector:
     """Filter & segment audio with voice activity detection."""
 
-    _log = logging.getLogger("audio/vad")
+    _log = logging.getLogger("vad")
 
-    def __init__(self, aggressiveness=3, device=None, input_rate=None, file=None):
-        super().__init__(device=device, input_rate=input_rate, file=file)
+    def __init__(self, source, aggressiveness=3):
+        self.source = source
         self.vad = webrtcvad.Vad(aggressiveness)
-
-    def frame_generator(self):
-        """Generator that yields all audio frames from microphone."""
-        if self.input_rate == self.RATE_PROCESS:
-            while True:
-                yield self.read()
-        else:
-            while True:
-                yield self.read_resampled()
 
     def vad_collector(self, padding_ms=300, ratio=0.75, frames=None):
         """
@@ -138,8 +128,8 @@ class VADAudio(Audio):
                   |---utterence---|        |---utterence---|
         """
         if frames is None:
-            frames = self.frame_generator()
-        num_padding_frames = padding_ms // self.frame_duration_ms
+            frames = self.source.frame_generator()
+        num_padding_frames = padding_ms // self.source.frame_duration_ms
         ring_buffer = collections.deque(maxlen=num_padding_frames)
         triggered = False
 
@@ -148,7 +138,7 @@ class VADAudio(Audio):
                 self._log.error("End of audio, VAD generator ending")
                 return
 
-            is_speech = self.vad.is_speech(frame, self.sample_rate)
+            is_speech = self.vad.is_speech(frame, self.source.RATE_PROCESS)
 
             if not triggered:
                 ring_buffer.append((frame, is_speech))
