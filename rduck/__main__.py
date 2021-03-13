@@ -3,8 +3,6 @@ import os
 import logging
 from datetime import datetime
 
-from halo import Halo
-
 from .audio import Audio, VADetector
 from .speech import Recognizer
 
@@ -103,21 +101,15 @@ frames = vad.vad_collector(padding_ms=ARGS.vad_padding)
 
 # Stream from microphone to DeepSpeech using VAD
 spinner = None
-if not ARGS.nospinner:
-    spinner = Halo(spinner="line")
 wav_data = bytearray()
 
 for frame in frames:
     if frame is not None:
-        if spinner:
-            spinner.start()
         recognizer.process_frame(frame)
 
         if ARGS.savewav:
             wav_data.extend(frame)
     else:
-        if spinner:
-            spinner.stop()
 
         if ARGS.savewav:
             filename = datetime.now().strftime("rec_%Y-%m-%d_%H-%M-%S_%f.wav")
