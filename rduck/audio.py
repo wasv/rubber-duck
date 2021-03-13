@@ -9,7 +9,7 @@ import webrtcvad
 from scipy import signal
 
 
-class Audio(object):
+class Audio:
     """
     Streams raw audio from microphone.
     Data is received in a separate thread,
